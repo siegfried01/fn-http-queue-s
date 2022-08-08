@@ -50,14 +50,16 @@
 param useSourceControl bool = false
 @description('The name of the function app that you wish to create.')
 param siteName01 string='fn-http-queue-s-01'
+@description('The name of the function app that you wish to create.')
+param siteName02 string='fn-http-queue-s-02'
 
 @description('The location to use for creating the function app and hosting plan. It must be one of the Azure locations that support function apps.')
 param location string = resourceGroup().location
 
 var storageName_var = 'function${uniqueString(siteName01)}'
 var contentShareName = toLower(siteName01)
-var repoUrl01 = 'https://github.com/siegfried01/fn-http-queue-s'
 var branch = 'master'
+var repoUrl = 'https://github.com/siegfried01/fn-http-queue-s'
 
 resource fnAppWebSite01 'Microsoft.Web/sites@2016-03-01' = {
   name: siteName01
@@ -106,11 +108,67 @@ resource fnAppSite01 'Microsoft.Web/sites/sourcecontrols@2015-08-01' = if(useSou
   location: location
   name: 'web'
   properties: {
-    repoUrl: repoUrl01
+    repoUrl: repoUrl
     branch: branch
     isManualIntegration: true
   }
 }
+
+
+resource fnAppWebSite02 'Microsoft.Web/sites@2016-03-01' = {
+  name: siteName02
+  properties: {
+    name: siteName02
+    siteConfig: {
+      appSettings: [
+        {
+          name: 'AzureWebJobsDashboard'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageName_var};AccountKey=${listKeys(storageName.id, '2015-05-01-preview').key1}'
+        }
+        {
+          name: 'AzureWebJobsStorage'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageName_var};AccountKey=${listKeys(storageName.id, '2015-05-01-preview').key1}'
+        }
+        {
+          name: 'FUNCTIONS_EXTENSION_VERSION'
+          value: '~1'
+        }
+        {
+          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageName_var};AccountKey=${listKeys(storageName.id, '2015-05-01-preview').key1}'
+        }
+        {
+          name: 'WEBSITE_CONTENTSHARE'
+          value: contentShareName
+        }
+        {
+          name: 'ROUTING_EXTENSION_VERSION'
+          value: '~0.1'
+        }
+        {
+          name: 'Storage'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageName_var};AccountKey=${listKeys(storageName.id, '2015-05-01-preview').key1}'
+        }
+      ]
+    }
+    clientAffinityEnabled: false
+  }
+  location: location
+  kind: 'functionapp'
+}
+
+resource fnAppSite02 'Microsoft.Web/sites/sourcecontrols@2015-08-01' = if(useSourceControl) {
+  parent: fnAppWebSite02
+  location: location
+  name: 'web'
+  properties: {
+    repoUrl: repoUrl
+    branch: branch
+    isManualIntegration: true
+  }
+}
+
+
 
 resource storageName 'Microsoft.Storage/storageAccounts@2015-05-01-preview' = {
   name: storageName_var
